@@ -1087,7 +1087,7 @@ nc_ctx_fill_ietf_netconf(struct nc_session *session, struct schema_info *modules
     }
     if (!modules[u].name) {
         ERR(session, "Base NETCONF schema not supported by the server.");
-        return -1;
+        // return -1;
     }
 
     ietfnc = ly_ctx_get_module_implemented(session->ctx, "ietf-netconf");
