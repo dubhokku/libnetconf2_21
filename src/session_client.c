@@ -2292,6 +2292,7 @@ nc_recv_reply_xml(struct nc_session *session, struct nc_rpc *rpc, uint64_t msgid
 
     /* get a duplicate of the RPC node to append reply to */
     if (recv_reply_dup_rpc(session, rpc, op)) {
+        ERR( session, "recv_reply_dup_rpc() return fault" );
         return NC_MSG_ERROR;
     }
 
