@@ -2027,6 +2027,41 @@ cleanup:
     return ret;
 }
 
+static NC_MSG_TYPE
+recv_reply_xml(struct nc_session *session, int timeout, struct lyd_node *op, uint64_t msgid, struct lyd_node **envp, struct ly_in **msg)
+{
+    LY_ERR lyrc;
+    // struct ly_in *msg = NULL;
+    NC_MSG_TYPE ret = NC_MSG_ERROR;
+
+    assert(op && (op->schema->nodetype & (LYS_RPC | LYS_ACTION)));
+
+    *envp = NULL;
+
+    /* Receive messages until a rpc-reply is found or a timeout or error reached */
+    ret = recv_msg(session, timeout, NC_MSG_REPLY, &msg);
+    if (ret != NC_MSG_REPLY) {
+        goto cleanup;
+    }
+
+    /* parse 
+    lyrc = lyd_parse_op(NULL, op, msg, LYD_XML, LYD_TYPE_REPLY_NETCONF, envp, NULL);
+    if (!lyrc) {
+        ret = recv_reply_check_msgid(session, *envp, msgid);
+        goto cleanup;
+    } else {
+        ERR(session, "Received an invalid message (%s).", ly_errmsg(LYD_CTX(op)));
+        lyd_free_tree(*envp);
+        *envp = NULL;
+        ret = NC_MSG_ERROR;
+        goto cleanup;
+    } */
+
+cleanup:
+    ly_in_free(msg, 1);
+    return ret;
+}
+
 static int
 recv_reply_dup_rpc(struct nc_session *session, struct nc_rpc *rpc, struct lyd_node **op)
 {
@@ -2222,6 +2257,46 @@ nc_recv_reply(struct nc_session *session, struct nc_rpc *rpc, uint64_t msgid, in
 
     /* receive a reply */
     ret = recv_reply(session, timeout, *op, msgid, envp);
+
+    /* do not return the RPC copy on error or if the reply includes no data */
+    if (((ret != NC_MSG_REPLY) && (ret != NC_MSG_REPLY_ERR_MSGID)) || !lyd_child(*op)) {
+        lyd_free_tree(*op);
+        *op = NULL;
+    }
+    return ret;
+}
+
+API NC_MSG_TYPE
+nc_recv_reply_xml(struct nc_session *session, struct nc_rpc *rpc, uint64_t msgid, int timeout, struct lyd_node **envp, 
+        struct lyd_node **op, struct ly_in **msg)
+{
+    NC_MSG_TYPE ret;
+
+    if (!session) {
+        ERRARG("session");
+        return NC_MSG_ERROR;
+    } else if (!rpc) {
+        ERRARG("rpc");
+        return NC_MSG_ERROR;
+    } else if (!msgid) {
+        ERRARG("msgid");
+        return NC_MSG_ERROR;
+    } else if (!msg) {
+        ERRARG("msg");
+        return NC_MSG_ERROR;
+
+    } else if ((session->status != NC_STATUS_RUNNING) || (session->side != NC_CLIENT)) {
+        ERR(session, "Invalid session to receive RPC replies.");
+        return NC_MSG_ERROR;
+    }
+
+    /* get a duplicate of the RPC node to append reply to */
+    if (recv_reply_dup_rpc(session, rpc, op)) {
+        return NC_MSG_ERROR;
+    }
+
+    /* receive a reply */
+    ret = recv_reply_xml(session, timeout, *op, msgid, envp, msg);
 
     /* do not return the RPC copy on error or if the reply includes no data */
     if (((ret != NC_MSG_REPLY) && (ret != NC_MSG_REPLY_ERR_MSGID)) || !lyd_child(*op)) {
