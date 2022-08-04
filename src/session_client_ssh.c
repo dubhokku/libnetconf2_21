@@ -1655,7 +1655,7 @@ _nc_connect_libssh(ssh_session ssh_session, struct ly_ctx *ctx, struct nc_keepal
     session->status = NC_STATUS_RUNNING;
 
     if (nc_ctx_check_and_fill(session) == -1) {
-        goto fail;
+        // goto fail;
     }
 
     /* store information if not previously */
